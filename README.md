@@ -1,4 +1,4 @@
-# wordpress_to_joomla
+# joomla_to_wordpress
 
 Forked from https://plugins.trac.wordpress.org/browser/fg-joomla-to-wordpress/ Release 4.35.0
 
