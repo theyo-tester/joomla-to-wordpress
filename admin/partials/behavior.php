@@ -4,6 +4,18 @@
 				<tr>
 					<th scope="row"><?php _e('Import introtext:', 'fg-joomla-to-wordpress'); ?></th>
 					<td>
+				<tr>
+					<th scope="row"><?php _e('Translations:', 'fg-joomla-to-wordpress'); ?></th>
+					<td><input id="import_translations" name="import_translations" type="checkbox" value="1" <?php checked($data['import_translations'], 1); ?> /> <label for="import_translations"><?php _e('Import published Falang article translations', 'fg-joomla-to-wordpress'); ?></label></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="translation_plugin"><?php _e('Multilingual plugin:', 'fg-joomla-to-wordpress'); ?></label></th>
+					<td>
+						<select id="translation_plugin" name="translation_plugin">
+							<option value="polylang" <?php selected($data['translation_plugin'], 'polylang'); ?>><?php _e('Polylang', 'fg-joomla-to-wordpress'); ?></option>
+						</select>
+					</td>
+				</tr>
 						<input id="introtext_in_excerpt" name="introtext" type="radio" value="in_excerpt" <?php checked($data['introtext'], 'in_excerpt'); ?> /> <label for="introtext_in_excerpt" title="<?php _e("The text before the «Read more» split will be imported into the excerpt.", 'fg-joomla-to-wordpress'); ?>"><?php _e('to the excerpt', 'fg-joomla-to-wordpress'); ?></label>&nbsp;&nbsp;
 						<input id="introtext_in_content" name="introtext" type="radio" value="in_content" <?php checked($data['introtext'], 'in_content'); ?> /> <label for="introtext_in_content" title="<?php _e("The text before the «Read more» split will be imported into the post content with a «read more» link.", 'fg-joomla-to-wordpress'); ?>"><?php _e('to the content', 'fg-joomla-to-wordpress'); ?></label>&nbsp;&nbsp;
 						<input id="introtext_in_excerpt_and_content" name="introtext" type="radio" value="in_excerpt_and_content" <?php checked($data['introtext'], 'in_excerpt_and_content'); ?> /> <label for="introtext_in_excerpt_and_content" title="<?php _e("The text before the «Read more» split will be imported into both the excerpt and the post content.", 'fg-joomla-to-wordpress'); ?>"><?php _e('to both', 'fg-joomla-to-wordpress'); ?></label>

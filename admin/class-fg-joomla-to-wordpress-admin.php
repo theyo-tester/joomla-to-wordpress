@@ -330,6 +330,8 @@ if ( !class_exists('FG_Joomla_to_WordPress_Admin', false) ) {
 				'meta_keywords_in_tags'	=> 0,
 				'import_as_pages'		=> 0,
 				'import_menus'			=> 0,
+				'import_translations'	=> 0,
+				'translation_plugin'	=> 'polylang',
 				'timeout'				=> 20,
 				'logger_autorefresh'	=> 1,
 			);
@@ -1115,6 +1117,12 @@ SQL;
 				$message .= sprintf(_n('%d web link', '%d web links', $weblinks_count, 'fg-joomla-to-wordpress'), $weblinks_count) . "\n";
 			}
 
+			// Menu items
+			if ( $this->table_exists('menu') ) {
+				$menu_items_count = $this->get_menu_items_count();
+				$message .= sprintf(_n('%d menu item', '%d menu items', $menu_items_count, 'fg-joomla-to-wordpress'), $menu_items_count) . "\n";
+			}
+
 			$message = apply_filters('fgj2wp_pre_display_joomla_info', $message);
 
 			$this->display_admin_notice($message);
@@ -1255,6 +1263,26 @@ SQL;
 		}
 
 		/**
+		 * Get the number of published Joomla menu items
+		 *
+		 * @return int Number of menu items
+		 */
+		private function get_menu_items_count() {
+			$prefix = $this->plugin_options['prefix'];
+			$client_criteria = $this->column_exists('menu', 'client_id')? 'AND client_id = 0' : '';
+			$sql = "
+				SELECT COUNT(*) AS nb
+				FROM {$prefix}menu
+				WHERE published = 1
+				$client_criteria
+				AND id > 1
+			";
+			$result = $this->joomla_query($sql);
+			$menu_items_count = isset($result[0]['nb'])? $result[0]['nb'] : 0;
+			return $menu_items_count;
+		}
+
+		/**
 		 * Save the plugin options
 		 *
 		 */
@@ -1304,6 +1332,8 @@ SQL;
 				'meta_keywords_in_tags'	=> filter_input(INPUT_POST, 'meta_keywords_in_tags', FILTER_VALIDATE_BOOLEAN),
 				'import_as_pages'		=> filter_input(INPUT_POST, 'import_as_pages', FILTER_VALIDATE_BOOLEAN),
 				'import_menus'			=> filter_input(INPUT_POST, 'import_menus', FILTER_VALIDATE_BOOLEAN),
+				'import_translations'	=> filter_input(INPUT_POST, 'import_translations', FILTER_VALIDATE_BOOLEAN),
+				'translation_plugin'	=> filter_input(INPUT_POST, 'translation_plugin', FILTER_SANITIZE_SPECIAL_CHARS),
 				'timeout'				=> filter_input(INPUT_POST, 'timeout', FILTER_SANITIZE_NUMBER_INT),
 				'logger_autorefresh'	=> filter_input(INPUT_POST, 'logger_autorefresh', FILTER_VALIDATE_BOOLEAN),
 			);
