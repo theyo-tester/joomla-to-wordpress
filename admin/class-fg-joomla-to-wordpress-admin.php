@@ -60,6 +60,11 @@ if ( !class_exists('FG_Joomla_to_WordPress_Admin', false) ) {
 		private $log_file_url;
 		private $test_antiduplicate = false;
 		private $imported_tags = array();
+		private $falang_translations = array();
+		private $falang_languages = array();
+		private $polylang_languages = array();
+		private $joomla_default_language = null;
+		private $warned_translation_languages = array();
 
 		/**
 		 * Initialize the class and set its properties.
@@ -1305,6 +1310,10 @@ SQL;
 			if ( !empty($url) && (preg_match('#^https?://#', $url) == 0) ) {
 				$url = 'http://' . $url;
 			}
+			$translation_plugin = filter_input(INPUT_POST, 'translation_plugin', FILTER_SANITIZE_SPECIAL_CHARS);
+			if ( $translation_plugin != 'polylang' ) {
+				$translation_plugin = 'polylang';
+			}
 			return array(
 				'automatic_empty'		=> filter_input(INPUT_POST, 'automatic_empty', FILTER_VALIDATE_BOOLEAN),
 				'url'					=> $url,
@@ -1333,7 +1342,7 @@ SQL;
 				'import_as_pages'		=> filter_input(INPUT_POST, 'import_as_pages', FILTER_VALIDATE_BOOLEAN),
 				'import_menus'			=> filter_input(INPUT_POST, 'import_menus', FILTER_VALIDATE_BOOLEAN),
 				'import_translations'	=> filter_input(INPUT_POST, 'import_translations', FILTER_VALIDATE_BOOLEAN),
-				'translation_plugin'	=> filter_input(INPUT_POST, 'translation_plugin', FILTER_SANITIZE_SPECIAL_CHARS),
+				'translation_plugin'	=> $translation_plugin,
 				'timeout'				=> filter_input(INPUT_POST, 'timeout', FILTER_SANITIZE_NUMBER_INT),
 				'logger_autorefresh'	=> filter_input(INPUT_POST, 'logger_autorefresh', FILTER_VALIDATE_BOOLEAN),
 			);
@@ -1472,6 +1481,17 @@ SQL;
 					$this->display_admin_error(__('The PHP variable "allow_url_fopen" must be set to "On" in the php.ini file.', 'fg-joomla-to-wordpress'));
 					$import_doable = false;
 				}
+
+				if ( $this->plugin_options['import_translations'] ) {
+					if ( !$this->table_exists('falang_content') || !$this->table_exists('languages') ) {
+						$this->display_admin_error(__('Falang translation tables were not found in the Joomla database.', 'fg-joomla-to-wordpress'));
+						$import_doable = false;
+					}
+					if ( $this->plugin_options['translation_plugin'] == 'polylang' && (!function_exists('pll_set_post_language') || !function_exists('pll_save_post_translations') || !function_exists('pll_languages_list')) ) {
+						$this->display_admin_error(__('Polylang must be installed and active to import translations.', 'fg-joomla-to-wordpress'));
+						$import_doable = false;
+					}
+				}
 			}
 			return $import_doable;
 		}
@@ -1497,6 +1517,9 @@ SQL;
 			// Articles
 			if ( !isset($this->premium_options['skip_articles']) || !$this->premium_options['skip_articles'] ) {
 				$count += $this->get_posts_count();
+				if ( $this->plugin_options['import_translations'] ) {
+					$count += $this->get_falang_posts_count();
+				}
 			}
 
 			// Web links
@@ -1769,10 +1792,15 @@ SQL;
 		 */
 		private function import_posts($test_mode = false) {
 			$step = $test_mode? 1 : $this->chunks_size; // to limit the results
+			$translations_count = 0;
 
 			$message = __('Importing posts...', 'fg-joomla-to-wordpress');
 			if ( defined('WP_CLI') ) {
-				$progress_cli = \WP_CLI\Utils\make_progress_bar($message, $this->get_posts_count());
+				$progress_count = $this->get_posts_count();
+				if ( $this->plugin_options['import_translations'] ) {
+					$progress_count += $this->get_falang_posts_count();
+				}
+				$progress_cli = \WP_CLI\Utils\make_progress_bar($message, $progress_count);
 			} else {
 				$this->log($message);
 			}
@@ -1786,18 +1814,35 @@ SQL;
 				}
 				$posts = $this->get_posts($step); // Get the Joomla posts
 				$posts_count = count($posts);
+				$batch_translations_count = 0;
+				$batch_translation_rows = 0;
+				if ( $this->plugin_options['import_translations'] ) {
+					$this->load_falang_translations($posts);
+				}
 				
 				if ( is_array($posts) ) {
 					foreach ( $posts as $post ) {
-						if ( $this->import_post($post) === false ) {
+						$imported_post_id = $this->import_post($post);
+						if ( $imported_post_id === false ) {
 							return false;
+						}
+						if ( $this->plugin_options['import_translations'] && !is_wp_error($imported_post_id) && !empty($imported_post_id) ) {
+							$translation_result = $this->import_falang_translations($post, $imported_post_id);
+							$batch_translations_count += $translation_result['imported'];
+							$batch_translation_rows += $translation_result['processed'];
+							if ( defined('WP_CLI') ) {
+								for ( $i = 0; $i < $translation_result['processed']; $i++ ) {
+									$progress_cli->tick();
+								}
+							}
 						}
 						if ( defined('WP_CLI') ) {
 							$progress_cli->tick();
 						}
 					}
 				}
-				$this->progressbar->increment_current_count($posts_count);
+				$this->progressbar->increment_current_count($posts_count + $batch_translation_rows);
+				$translations_count += $batch_translations_count;
 			} while ( !is_null($posts) && ($posts_count > 0) && !$test_mode);
 
 			if ( defined('WP_CLI') ) {
@@ -1807,6 +1852,9 @@ SQL;
 			if ( !$this->import_stopped() ) {
 				// Hook for doing other actions after the import
 				do_action('fgj2wp_post_import_posts');
+			}
+			if ( $this->plugin_options['import_translations'] ) {
+				$this->display_admin_notice(sprintf(_n('%d translation imported', '%d translations imported', $translations_count, 'fg-joomla-to-wordpress'), $translations_count));
 			}
 
 			return true;
@@ -1821,9 +1869,9 @@ SQL;
 		 * @param bool $test_mode Test mode active
 		 * @return int new post ID | false | WP_Error
 		 */
-		private function import_post($post, $test_mode = false) {
+		private function import_post($post, $test_mode = false, $translation_id = '') {
 			// Anti-duplicate
-			if ( !$test_mode && !$this->test_antiduplicate ) {
+			if ( !$test_mode && empty($translation_id) && !$this->test_antiduplicate ) {
 				sleep(2);
 				$test_post_id = $this->get_wp_post_id_from_joomla_id($post['id']);
 				if ( !empty($test_post_id) ) {
@@ -1924,7 +1972,9 @@ SQL;
 			$new_post_id = wp_insert_post($new_post, true);
 			
 			// Increment the Joomla last imported post ID
-			update_option('fgj2wp_last_article_id', $post['id']);
+			if ( empty($translation_id) ) {
+				update_option('fgj2wp_last_article_id', $post['id']);
+			}
 			
 			if ( is_wp_error($new_post_id) ) {
 				$this->display_admin_error(sprintf(__('Article #%d:', 'fg-joomla-to-wordpress'), $post['id']) . ' ' . $new_post_id->get_error_message() . ' ' . $new_post_id->get_error_data());
@@ -1947,10 +1997,16 @@ SQL;
 					update_option('sticky_posts', $sticky_posts);
 				}
 
-				// Add the Joomla ID as a post meta in order to modify links after
-				add_post_meta($new_post_id, '_fgj2wp_old_id', $post['id'], true);
+				if ( !empty($translation_id) ) {
+					add_post_meta($new_post_id, '_fgj2wp_old_translation_id', $translation_id, true);
+				} else {
+					// Add the Joomla ID as a post meta in order to modify links after
+					add_post_meta($new_post_id, '_fgj2wp_old_id', $post['id'], true);
+				}
 
-				$this->posts_count++;
+				if ( empty($translation_id) ) {
+					$this->posts_count++;
+				}
 
 				// Hook for doing other actions after inserting the post
 				do_action('fgj2wp_post_insert_post', $new_post_id, $post, $new_post['post_type']);
@@ -2280,6 +2336,7 @@ SQL;
 
 			$last_joomla_id = (int)get_option('fgj2wp_last_article_id'); // to restore the import where it left
 			$prefix = $this->plugin_options['prefix'];
+			$language_field = $this->column_exists('content', 'language')? 'p.language' : "'*'";
 
 			$extra_criteria = '';
 			if ( $this->plugin_options['archived_posts'] == 'not_imported' ) {
@@ -2299,7 +2356,7 @@ SQL;
 			$extra_joins = apply_filters('fgj2wp_get_posts_add_extra_joins', '');
 
 			$sql = "
-				SELECT DISTINCT p.id, 'content' AS type, p.title, p.alias, p.introtext, p.`fulltext`, p.state, p.catid, p.modified, p.created AS `date`, p.attribs, p.metakey, p.metadesc, p.access, p.ordering
+				SELECT DISTINCT p.id, 'content' AS type, p.title, p.alias, p.introtext, p.`fulltext`, p.state, p.catid, p.modified, p.created AS `date`, p.attribs, p.metakey, p.metadesc, p.access, p.ordering, $language_field AS language
 				$extra_cols
 				FROM {$prefix}content p
 				$extra_joins
@@ -2312,6 +2369,195 @@ SQL;
 			$sql = apply_filters('fgj2wp_get_posts_sql', $sql, $prefix, $extra_cols, $extra_joins, $last_joomla_id, $limit);
 			$posts = $this->joomla_query($sql);
 			return $posts;
+		}
+
+		/**
+		 * Get the number of published Falang article translations
+		 *
+		 * @return int Number of translated articles
+		 */
+		private function get_falang_posts_count() {
+			$prefix = $this->plugin_options['prefix'];
+			$extra_criteria = '';
+			if ( $this->plugin_options['archived_posts'] == 'not_imported' ) {
+				$extra_criteria .= 'AND p.state != 2' . "\n";
+			}
+			$skipped_categories = $this->get_skipped_categories();
+			if ( !empty($skipped_categories) ) {
+				$extra_criteria .= 'AND p.catid NOT IN(' . implode(',', $skipped_categories) . ')' . "\n";
+			}
+			$sql = "
+				SELECT COUNT(*) AS nb
+				FROM (
+					SELECT fc.reference_id, fc.language_id
+					FROM {$prefix}falang_content fc
+					INNER JOIN {$prefix}languages l ON l.lang_id = fc.language_id AND l.published = 1
+					INNER JOIN {$prefix}content p ON p.id = fc.reference_id
+					WHERE fc.reference_table = 'content'
+					AND fc.reference_field IN ('title', 'alias', 'introtext', 'fulltext', 'attribs', 'metakey', 'metadesc')
+					AND fc.published = 1
+					AND p.state >= -1
+					$extra_criteria
+					GROUP BY fc.reference_id, fc.language_id
+				) AS translated_articles
+			";
+			$result = $this->joomla_query($sql);
+			return isset($result[0]['nb'])? (int)$result[0]['nb'] : 0;
+		}
+
+		/**
+		 * Load published Falang fields for a batch of Joomla articles
+		 *
+		 * @param array $posts Joomla articles
+		 */
+		private function load_falang_translations($posts) {
+			$this->falang_translations = array();
+			if ( empty($posts) || !$this->table_exists('falang_content') || !$this->table_exists('languages') ) {
+				return;
+			}
+
+			$article_ids = array();
+			foreach ( $posts as $post ) {
+				$article_ids[] = (int)$post['id'];
+			}
+			$article_ids = array_unique($article_ids);
+			if ( empty($article_ids) ) {
+				return;
+			}
+
+			$prefix = $this->plugin_options['prefix'];
+			$sql = "
+				SELECT fc.reference_id, fc.language_id, fc.reference_field, fc.value
+				FROM {$prefix}falang_content fc
+				INNER JOIN {$prefix}languages l ON l.lang_id = fc.language_id AND l.published = 1
+				WHERE fc.reference_table = 'content'
+				AND fc.reference_id IN(" . implode(',', $article_ids) . ")
+				AND fc.reference_field IN ('title', 'alias', 'introtext', 'fulltext', 'attribs', 'metakey', 'metadesc')
+				AND fc.published = 1
+				ORDER BY fc.reference_id, fc.language_id, fc.id
+			";
+			$rows = $this->joomla_query($sql);
+			foreach ( $rows as $row ) {
+				$article_id = (int)$row['reference_id'];
+				$language_id = (int)$row['language_id'];
+				$this->falang_translations[$article_id][$language_id][$row['reference_field']] = $row['value'];
+			}
+
+			$languages = $this->joomla_query("SELECT lang_id, lang_code FROM {$prefix}languages WHERE published = 1");
+			$this->falang_languages = array();
+			foreach ( $languages as $language ) {
+				$this->falang_languages[(int)$language['lang_id']] = $language['lang_code'];
+			}
+		}
+
+		/**
+		 * Import the Falang translations belonging to one Joomla article
+		 *
+		 * @param array $post Joomla article
+		 * @param int $source_post_id Imported WordPress post ID
+		 * @return array Imported and processed translation counts
+		 */
+		private function import_falang_translations($post, $source_post_id) {
+			$result = array('imported' => 0, 'processed' => 0);
+			$article_id = (int)$post['id'];
+
+			$language_map = $this->get_polylang_language_map();
+			if ( null === $this->joomla_default_language ) {
+				$this->joomla_default_language = $this->get_joomla_language();
+			}
+			$source_language = !empty($post['language']) && $post['language'] != '*'? $post['language'] : $this->joomla_default_language;
+			$source_language = !empty($source_language)? $source_language : get_locale();
+			$source_language_key = $this->normalize_language_code($source_language);
+			if ( empty($language_map[$source_language_key]) ) {
+				$this->warn_missing_translation_language($source_language);
+				$result['processed'] = isset($this->falang_translations[$article_id])? count($this->falang_translations[$article_id]) : 0;
+				return $result;
+			}
+
+			$source_language_slug = $language_map[$source_language_key];
+			pll_set_post_language($source_post_id, $source_language_slug);
+			$translation_group = array($source_language_slug => (int)$source_post_id);
+			if ( empty($this->falang_translations[$article_id]) ) {
+				return $result;
+			}
+
+			foreach ( $this->falang_translations[$article_id] as $language_id => $fields ) {
+				$result['processed']++;
+				if ( empty($this->falang_languages[$language_id]) ) {
+					continue;
+				}
+				$language_key = $this->normalize_language_code($this->falang_languages[$language_id]);
+				if ( empty($language_map[$language_key]) ) {
+					$this->warn_missing_translation_language($this->falang_languages[$language_id]);
+					continue;
+				}
+				$language_slug = $language_map[$language_key];
+				if ( $language_slug == $source_language_slug ) {
+					continue;
+				}
+
+				$translated_post = $post;
+				foreach ( $fields as $field => $value ) {
+					if ( array_key_exists($field, $translated_post) ) {
+						$translated_post[$field] = $value;
+					}
+				}
+				$translation_id = $article_id . ':' . (int)$language_id;
+				$translated_post_id = $this->import_post($translated_post, false, $translation_id);
+				if ( is_wp_error($translated_post_id) || empty($translated_post_id) ) {
+					continue;
+				}
+
+				pll_set_post_language($translated_post_id, $language_slug);
+				$translation_group[$language_slug] = (int)$translated_post_id;
+				$result['imported']++;
+			}
+
+			if ( count($translation_group) > 1 ) {
+				pll_save_post_translations($translation_group);
+			}
+			return $result;
+		}
+
+		/**
+		 * Get Polylang locales mapped to their language slugs
+		 *
+		 * @return array Locale => language slug
+		 */
+		private function get_polylang_language_map() {
+			if ( empty($this->polylang_languages) ) {
+				$locales = pll_languages_list(array('fields' => 'locale'));
+				$slugs = pll_languages_list(array('fields' => 'slug'));
+				foreach ( $locales as $index => $locale ) {
+					if ( isset($slugs[$index]) ) {
+						$this->polylang_languages[$this->normalize_language_code($locale)] = $slugs[$index];
+					}
+				}
+			}
+			return $this->polylang_languages;
+		}
+
+		/**
+		 * Normalize a locale for matching Joomla and Polylang language codes
+		 *
+		 * @param string $language_code Language code
+		 * @return string Normalized language code
+		 */
+		private function normalize_language_code($language_code) {
+			return strtolower(str_replace('_', '-', $language_code));
+		}
+
+		/**
+		 * Display a warning once for each Falang language missing in Polylang
+		 *
+		 * @param string $language_code Language code
+		 */
+		private function warn_missing_translation_language($language_code) {
+			$language_key = $this->normalize_language_code($language_code);
+			if ( empty($this->warned_translation_languages[$language_key]) ) {
+				$this->display_admin_warning(sprintf(__('No matching Polylang language is configured for "%s". Related article translations were skipped.', 'fg-joomla-to-wordpress'), $language_code));
+				$this->warned_translation_languages[$language_key] = true;
+			}
 		}
 
 		/**
