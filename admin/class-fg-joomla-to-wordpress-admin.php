@@ -2477,8 +2477,8 @@ SQL;
 			}
 
 			$source_language_slug = $language_map[$source_language_key];
-			pll_set_post_language($source_post_id, $source_language_slug);
-			if ( pll_get_post_language($source_post_id, 'slug') !== $source_language_slug ) {
+			$source_language_assigned = pll_set_post_language($source_post_id, $source_language_slug);
+			if ( true !== $source_language_assigned && pll_get_post_language($source_post_id, 'slug') !== $source_language_slug ) {
 				$this->display_admin_error(sprintf(__('Unable to assign Joomla article #%1$d to the Polylang language "%2$s".', 'fg-joomla-to-wordpress'), $article_id, $source_language_slug));
 				$result['processed'] = isset($this->falang_translations[$article_id])? count($this->falang_translations[$article_id]) : 0;
 				return $result;
@@ -2515,8 +2515,8 @@ SQL;
 					continue;
 				}
 
-				pll_set_post_language($translated_post_id, $language_slug);
-				if ( pll_get_post_language($translated_post_id, 'slug') !== $language_slug ) {
+				$translation_language_assigned = pll_set_post_language($translated_post_id, $language_slug);
+				if ( true !== $translation_language_assigned && pll_get_post_language($translated_post_id, 'slug') !== $language_slug ) {
 					$this->display_admin_error(sprintf(__('Unable to assign the Falang translation of Joomla article #%1$d to the Polylang language "%2$s".', 'fg-joomla-to-wordpress'), $article_id, $language_slug));
 					continue;
 				}
