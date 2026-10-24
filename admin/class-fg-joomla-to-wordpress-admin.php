@@ -2524,11 +2524,13 @@ SQL;
 			}
 
 			if ( count($translation_group) > 1 ) {
-				pll_save_post_translations($translation_group);
-				$saved_translations = pll_get_post_translations($source_post_id);
+				$saved_translations = pll_save_post_translations($translation_group);
+				if ( !is_array($saved_translations) ) {
+					$saved_translations = pll_get_post_translations($source_post_id);
+				}
 				foreach ( $translation_group as $language_slug => $translation_post_id ) {
 					if ( !isset($saved_translations[$language_slug]) || (int)$saved_translations[$language_slug] != (int)$translation_post_id ) {
-						$this->display_admin_error(sprintf(__('Unable to link the imported translations of Joomla article #%d in Polylang.', 'fg-joomla-to-wordpress'), $article_id));
+						$this->display_admin_error(sprintf(__('Unable to link the imported translations of Joomla article #%1$d in Polylang. Polylang accepted languages: %2$s.', 'fg-joomla-to-wordpress'), $article_id, implode(', ', array_keys($saved_translations))));
 						return $result;
 					}
 				}
