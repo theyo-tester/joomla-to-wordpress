@@ -1363,8 +1363,10 @@ SQL;
 				// To solve the issue of links containing ":" in multisite mode
 				kses_remove_filters();
 				
-				global $wp_filter;
-				unset($wp_filter['wp_insert_post']); // Remove the "wp_insert_post" hook that consumes a lot of CPU and memory
+				if ( empty($this->plugin_options['import_translations']) ) {
+					global $wp_filter;
+					unset($wp_filter['wp_insert_post']); // Remove the "wp_insert_post" hook that consumes a lot of CPU and memory
+				}
 				
 				// Check prerequesites before the import
 				$do_import = apply_filters('fgj2wp_pre_import_check', true);
@@ -1487,7 +1489,7 @@ SQL;
 						$this->display_admin_error(__('Falang translation tables were not found in the Joomla database.', 'fg-joomla-to-wordpress'));
 						$import_doable = false;
 					}
-					if ( $this->plugin_options['translation_plugin'] == 'polylang' && (!function_exists('pll_set_post_language') || !function_exists('pll_save_post_translations') || !function_exists('pll_languages_list')) ) {
+					if ( $this->plugin_options['translation_plugin'] == 'polylang' && (!function_exists('pll_set_post_language') || !function_exists('pll_get_post_language') || !function_exists('pll_save_post_translations') || !function_exists('pll_get_post_translations') || !function_exists('pll_languages_list')) ) {
 						$this->display_admin_error(__('Polylang must be installed and active to import translations.', 'fg-joomla-to-wordpress'));
 						$import_doable = false;
 					}
@@ -2476,6 +2478,11 @@ SQL;
 
 			$source_language_slug = $language_map[$source_language_key];
 			pll_set_post_language($source_post_id, $source_language_slug);
+			if ( pll_get_post_language($source_post_id, 'slug') !== $source_language_slug ) {
+				$this->display_admin_error(sprintf(__('Unable to assign Joomla article #%1$d to the Polylang language "%2$s".', 'fg-joomla-to-wordpress'), $article_id, $source_language_slug));
+				$result['processed'] = isset($this->falang_translations[$article_id])? count($this->falang_translations[$article_id]) : 0;
+				return $result;
+			}
 			$translation_group = array($source_language_slug => (int)$source_post_id);
 			if ( empty($this->falang_translations[$article_id]) ) {
 				return $result;
@@ -2509,12 +2516,23 @@ SQL;
 				}
 
 				pll_set_post_language($translated_post_id, $language_slug);
+				if ( pll_get_post_language($translated_post_id, 'slug') !== $language_slug ) {
+					$this->display_admin_error(sprintf(__('Unable to assign the Falang translation of Joomla article #%1$d to the Polylang language "%2$s".', 'fg-joomla-to-wordpress'), $article_id, $language_slug));
+					continue;
+				}
 				$translation_group[$language_slug] = (int)$translated_post_id;
-				$result['imported']++;
 			}
 
 			if ( count($translation_group) > 1 ) {
 				pll_save_post_translations($translation_group);
+				$saved_translations = pll_get_post_translations($source_post_id);
+				foreach ( $translation_group as $language_slug => $translation_post_id ) {
+					if ( !isset($saved_translations[$language_slug]) || (int)$saved_translations[$language_slug] != (int)$translation_post_id ) {
+						$this->display_admin_error(sprintf(__('Unable to link the imported translations of Joomla article #%d in Polylang.', 'fg-joomla-to-wordpress'), $article_id));
+						return $result;
+					}
+				}
+				$result['imported'] = count($translation_group) - 1;
 			}
 			return $result;
 		}
