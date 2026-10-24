@@ -329,6 +329,7 @@ if ( !class_exists('FG_Joomla_to_WordPress_Admin', false) ) {
 				'force_media_import'	=> 0,
 				'meta_keywords_in_tags'	=> 0,
 				'import_as_pages'		=> 0,
+				'import_menus'			=> 0,
 				'timeout'				=> 20,
 				'logger_autorefresh'	=> 1,
 			);
@@ -1302,6 +1303,7 @@ SQL;
 				'force_media_import'	=> filter_input(INPUT_POST, 'force_media_import', FILTER_VALIDATE_BOOLEAN),
 				'meta_keywords_in_tags'	=> filter_input(INPUT_POST, 'meta_keywords_in_tags', FILTER_VALIDATE_BOOLEAN),
 				'import_as_pages'		=> filter_input(INPUT_POST, 'import_as_pages', FILTER_VALIDATE_BOOLEAN),
+				'import_menus'			=> filter_input(INPUT_POST, 'import_menus', FILTER_VALIDATE_BOOLEAN),
 				'timeout'				=> filter_input(INPUT_POST, 'timeout', FILTER_SANITIZE_NUMBER_INT),
 				'logger_autorefresh'	=> filter_input(INPUT_POST, 'logger_autorefresh', FILTER_VALIDATE_BOOLEAN),
 			);
@@ -1386,6 +1388,11 @@ SQL;
 					}
 				}
 				if ( !$this->import_stopped() ) {
+					if ( $this->plugin_options['import_menus'] ) {
+						$menu_items_count = $this->import_menus();
+						$this->display_admin_notice(sprintf(_n('%d menu item imported', '%d menu items imported', $menu_items_count, 'fg-joomla-to-wordpress'), $menu_items_count));
+					}
+
 					// Hook for doing other actions after the import
 					do_action('fgj2wp_post_import');
 				}
@@ -3106,6 +3113,150 @@ SQL;
 				$term = apply_filters('fgj2wp_get_wp_term_from_joomla_url', null, $url);
 			}
 			return $term;
+		}
+
+		/**
+		 * Import published Joomla menu items
+		 *
+		 * @return int Number of imported menu items
+		 */
+		private function import_menus() {
+			if ( !$this->table_exists('menu') ) {
+				return 0;
+			}
+
+			$prefix = $this->plugin_options['prefix'];
+			$client_criteria = $this->column_exists('menu', 'client_id')? 'AND client_id = 0' : '';
+			$order = $this->column_exists('menu', 'lft')? 'lft, id' : 'menutype, id';
+			$menu_type_details = array();
+			if ( $this->table_exists('menu_types') ) {
+				$menu_type_client_criteria = $this->column_exists('menu_types', 'client_id')? 'WHERE client_id = 0' : '';
+				$menu_types = $this->joomla_query("SELECT menutype, title, description FROM {$prefix}menu_types $menu_type_client_criteria");
+				foreach ( $menu_types as $menu_type_row ) {
+					$menu_type_details[$menu_type_row['menutype']] = $menu_type_row;
+				}
+			}
+			$sql = "
+				SELECT id, menutype, title, link, parent_id, browserNav
+				FROM {$prefix}menu
+				WHERE published = 1
+				$client_criteria
+				AND id > 1
+				ORDER BY $order
+			";
+			$menu_items = $this->joomla_query($sql);
+			$menu_ids = array();
+			$menu_positions = array();
+			$imported_count = 0;
+
+			foreach ( $menu_items as $menu_item ) {
+				$menu_type = $menu_item['menutype'];
+				if ( !isset($menu_ids[$menu_type]) ) {
+					$menu_type_title = isset($menu_type_details[$menu_type]['title'])? $menu_type_details[$menu_type]['title'] : $menu_type;
+					$menu_type_description = isset($menu_type_details[$menu_type]['description'])? $menu_type_details[$menu_type]['description'] : '';
+					$menu_ids[$menu_type] = $this->get_or_create_wp_menu($menu_type, $menu_type_title, $menu_type_description);
+					$menu_positions[$menu_type] = 0;
+				}
+				$menu_id = $menu_ids[$menu_type];
+				if ( is_wp_error($menu_id) ) {
+					$this->display_admin_error($menu_id->get_error_message());
+					continue;
+				}
+
+				$parent_id = isset($menu_item['parent_id'], $menu_ids[$menu_type . ':items'][$menu_item['parent_id']])? $menu_ids[$menu_type . ':items'][$menu_item['parent_id']] : 0;
+				$menu_positions[$menu_type]++;
+				$old_menu_item_id = $this->get_wp_post_id_from_meta('_fgj2wp_old_menu_item_id', $menu_item['id']);
+				$args = array(
+					'menu-item-title' => $menu_item['title'],
+					'menu-item-url' => $this->get_menu_item_url($menu_item),
+					'menu-item-type' => 'custom',
+					'menu-item-status' => 'publish',
+					'menu-item-parent-id' => $parent_id,
+					'menu-item-position' => $menu_positions[$menu_type],
+					'menu-item-target' => ((int)$menu_item['browserNav'] === 1)? '_blank' : '',
+				);
+				$wp_menu_item_id = wp_update_nav_menu_item($menu_id, $old_menu_item_id, $args);
+				if ( is_wp_error($wp_menu_item_id) ) {
+					$this->display_admin_error($wp_menu_item_id->get_error_message());
+					continue;
+				}
+
+				update_post_meta($wp_menu_item_id, '_fgj2wp_old_menu_item_id', $menu_item['id']);
+				$menu_ids[$menu_type . ':items'][$menu_item['id']] = $wp_menu_item_id;
+				$imported_count++;
+			}
+
+			return $imported_count;
+		}
+
+		/**
+		 * Get an existing WordPress menu for a Joomla menu type, or create it
+		 *
+		 * @param string $menu_type Joomla menu type
+		 * @param string $menu_title WordPress menu title
+		 * @param string $description Menu description
+		 * @return int|WP_Error WordPress menu ID
+		 */
+		private function get_or_create_wp_menu($menu_type, $menu_title, $description) {
+			$menu_title = !empty($menu_title)? $menu_title : $menu_type;
+			$menus = get_terms('nav_menu', array(
+				'hide_empty' => false,
+				'meta_key' => '_fgj2wp_old_menu_type',
+				'meta_value' => $menu_type,
+			));
+			if ( !is_wp_error($menus) && !empty($menus) ) {
+				$menu_id = (int)$menus[0]->term_id;
+				wp_update_term($menu_id, 'nav_menu', array('name' => $menu_title, 'description' => $description));
+				return $menu_id;
+			}
+
+			$menu_id = wp_create_nav_menu($menu_title, array('description' => $description));
+			if ( !is_wp_error($menu_id) ) {
+				update_term_meta($menu_id, '_fgj2wp_old_menu_type', $menu_type);
+			}
+			return $menu_id;
+		}
+
+		/**
+		 * Resolve Joomla article and category menu links to imported WordPress content
+		 *
+		 * @param array $menu_item Joomla menu item
+		 * @return string Menu item URL
+		 */
+		private function get_menu_item_url($menu_item) {
+			$link = html_entity_decode($menu_item['link'], ENT_QUOTES, 'UTF-8');
+			$parts = parse_url($link);
+			$query = array();
+			if ( isset($parts['query']) ) {
+				parse_str($parts['query'], $query);
+			}
+
+			if ( isset($query['option'], $query['view']) && $query['option'] == 'com_content' ) {
+				if ( $query['view'] == 'featured' ) {
+					return home_url('/');
+				} elseif ( $query['view'] == 'article' && isset($query['id']) ) {
+					$post_id = $this->get_wp_post_id_from_joomla_id((int)$query['id']);
+					if ( !empty($post_id) ) {
+						return get_permalink($post_id);
+					}
+				} elseif ( $query['view'] == 'category' && isset($query['id']) ) {
+					$term_id = $this->get_wp_term_id_from_meta('_fgj2wp_old_category_id', (int)$query['id']);
+					if ( !empty($term_id) ) {
+						$term_link = get_term_link((int)$term_id, 'category');
+						if ( !is_wp_error($term_link) ) {
+							return $term_link;
+						}
+					}
+				}
+			}
+
+			if ( isset($parts['scheme']) || isset($parts['host']) ) {
+				return $link;
+			}
+			if ( !empty($this->plugin_options['url']) ) {
+				return trailingslashit($this->plugin_options['url']) . ltrim($link, '/');
+			}
+			return $link;
 		}
 		
 		/**

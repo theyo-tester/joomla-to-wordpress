@@ -24,6 +24,7 @@ Major features include:
 * migrates categories as sub-categories
 * migrates Joomla posts (published, unpublished and archived)
 * migrates Joomla web links
+* imports published Joomla navigation menus (optional)
 * uploads all the posts media in WP uploads directories (as an option)
 * uploads external media (as an option)
 * modifies the post content to keep the media links
@@ -43,7 +44,6 @@ No need to subscribe to an external web site.
 The **Premium version** includes these extra features:
 
 * migrates authors and other users with their passwords
-* migrates the navigation menus
 * SEO: migrates the meta description and the meta keywords
 * SEO: keeps the Joomla articles IDs or redirects Joomla URLs to the new WordPress URLs
 * compatible with **Joomla 1.0** and **Mambo 4.5 and 4.6** (process {mosimages} and {mospagebreak})

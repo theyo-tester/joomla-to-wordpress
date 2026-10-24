@@ -46,6 +46,8 @@
 
 <p><strong>Create pages:</strong> You have the choice to import the Joomla articles as WordPress posts or pages.</p>
 
+<p><strong>Navigation menus:</strong> When enabled, published front-end menu items are imported, preserving their menu types and hierarchy. Article and category links are redirected to the imported WordPress content where possible. Imported menus are not automatically assigned to theme locations.</p>
+
 <p><strong>Create submenus with subcategories for categories menus:</strong> <span class="fgj2wp_premium_feature">(Premium feature)</span>
 This option will create automatically subcategories menus for each category menu.
 

@@ -2,7 +2,6 @@
 		<h3><?php _e('Do you need extra features?', 'fg-joomla-to-wordpress'); ?></h3>
 		<ul>
 			<li><?php _e('authors and all users migration', 'fg-joomla-to-wordpress'); ?></li>
-			<li><?php _e('menus migration', 'fg-joomla-to-wordpress'); ?></li>
 			<li><?php _e('HTML modules migration', 'fg-joomla-to-wordpress'); ?></li>
 			<li><?php _e('SEO: keeps Joomla IDs or redirects standard Joomla URLs', 'fg-joomla-to-wordpress'); ?></li>
 			<li><?php _e('SEO: Keeps meta description and meta keywords', 'fg-joomla-to-wordpress'); ?></li>

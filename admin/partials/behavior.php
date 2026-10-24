@@ -70,3 +70,7 @@
 					<th scope="row"><?php _e('Create pages:', 'fg-joomla-to-wordpress'); ?></th>
 					<td><input id="import_as_pages" name="import_as_pages" type="checkbox" value="1" <?php checked($data['import_as_pages'], 1); ?> /> <label for="import_as_pages" ><?php _e('Import as pages instead of blog posts (without categories)', 'fg-joomla-to-wordpress'); ?></label></td>
 				</tr>
+				<tr>
+					<th scope="row"><?php _e('Navigation menus:', 'fg-joomla-to-wordpress'); ?></th>
+					<td><input id="import_menus" name="import_menus" type="checkbox" value="1" <?php checked($data['import_menus'], 1); ?> /> <label for="import_menus"><?php _e('Import published Joomla menus', 'fg-joomla-to-wordpress'); ?></label></td>
+				</tr>
