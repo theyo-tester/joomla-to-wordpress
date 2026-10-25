@@ -3464,13 +3464,12 @@ SQL;
 				$old_menu_item_id = $this->get_wp_post_id_from_meta('_fgj2wp_old_menu_item_id', $menu_item['id']);
 				$args = array(
 					'menu-item-title' => $menu_item['title'],
-					'menu-item-url' => $this->get_menu_item_url($menu_item),
-					'menu-item-type' => 'custom',
 					'menu-item-status' => 'publish',
 					'menu-item-parent-id' => $parent_id,
 					'menu-item-position' => $menu_positions[$menu_type],
 					'menu-item-target' => ((int)$menu_item['browserNav'] === 1)? '_blank' : '',
 				);
+				$args = array_merge($args, $this->get_menu_item_args($menu_item));
 				$wp_menu_item_id = wp_update_nav_menu_item($menu_id, $old_menu_item_id, $args);
 				if ( is_wp_error($wp_menu_item_id) ) {
 					$this->display_admin_error($wp_menu_item_id->get_error_message());
@@ -3511,6 +3510,55 @@ SQL;
 				update_term_meta($menu_id, '_fgj2wp_old_menu_type', $menu_type);
 			}
 			return $menu_id;
+		}
+
+		/**
+		 * Get WordPress menu item arguments for a Joomla menu item
+		 *
+		 * @param array $menu_item Joomla menu item
+		 * @return array Menu item arguments
+		 */
+		private function get_menu_item_args($menu_item) {
+			$args = array(
+				'menu-item-url' => $this->get_menu_item_url($menu_item),
+				'menu-item-type' => 'custom',
+			);
+
+			$link = html_entity_decode($menu_item['link'], ENT_QUOTES, 'UTF-8');
+			$parts = parse_url($link);
+			$query = array();
+			if ( isset($parts['query']) ) {
+				parse_str($parts['query'], $query);
+			}
+
+			if ( isset($query['option'], $query['view']) && $query['option'] == 'com_content' ) {
+				if ( $query['view'] == 'category' && isset($query['id']) ) {
+					$term_id = $this->get_wp_term_id_from_meta('_fgj2wp_old_category_id', (int)$query['id']);
+					if ( !empty($term_id) ) {
+						$args = array(
+							'menu-item-type' => 'taxonomy',
+							'menu-item-object' => 'category',
+							'menu-item-object-id' => (int)$term_id,
+							'menu-item-url' => '',
+						);
+					}
+				} elseif ( $query['view'] == 'article' && isset($query['id']) ) {
+					$post_id = $this->get_wp_post_id_from_joomla_id((int)$query['id']);
+					if ( !empty($post_id) ) {
+						$post_type = get_post_type($post_id);
+						if ( $post_type ) {
+							$args = array(
+								'menu-item-type' => 'post_type',
+								'menu-item-object' => $post_type,
+								'menu-item-object-id' => (int)$post_id,
+								'menu-item-url' => '',
+							);
+						}
+					}
+				}
+			}
+
+			return $args;
 		}
 
 		/**
