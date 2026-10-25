@@ -27,10 +27,6 @@ msgstr ""
 msgid "some RSBlog posts"
 msgstr ""
 
-#: admin/class-fg-joomla-to-wordpress-modules-check.php:78
-msgid "some Falang translations"
-msgstr ""
-
 #: admin/partials/settings.php:11
 msgid "This field is used to pull the media off that site. It must contain the URL of the original site."
 msgstr ""
@@ -266,7 +262,7 @@ msgid "https://www.fredericgilles.net/"
 msgstr ""
 
 #. Author of the plugin/theme
-msgid "Frédéric GILLES"
+msgid "Frédéric GILLES (mod by teoli)"
 msgstr ""
 
 #. Description of the plugin/theme

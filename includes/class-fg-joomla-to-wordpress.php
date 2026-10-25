@@ -25,7 +25,7 @@
  * @since      2.0.0
  * @package    FG_Joomla_to_WordPress
  * @subpackage FG_Joomla_to_WordPress/includes
- * @author     Frédéric GILLES
+ * @author     Frédéric GILLES (mod by teoli)
  */
 class FG_Joomla_to_WordPress {
 

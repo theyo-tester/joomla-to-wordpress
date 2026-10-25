@@ -436,10 +436,6 @@ msgstr "des traductions Joom!Fish"
 msgid "Joom!Fish add-on"
 msgstr "du module Joom!Fish"
 
-#: admin/class-fg-joomla-to-wordpress-modules-check.php:101
-msgid "some Falang translations"
-msgstr "des traductions Falang"
-
 #: admin/class-fg-joomla-to-wordpress-modules-check.php:108
 msgid "some Zoo items"
 msgstr "des éléments Zoo"

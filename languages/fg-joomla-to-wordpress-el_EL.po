@@ -402,10 +402,6 @@ msgstr "μερικές Joom!Fish μεταφράσεις"
 msgid "Joom!Fish add-on"
 msgstr "Joom!Fish πρόσθετο"
 
-#: admin/class-fg-joomla-to-wordpress-modules-check.php:99
-msgid "some Falang translations"
-msgstr "κάποιες Falang μεταφράσεις"
-
 #: admin/class-fg-joomla-to-wordpress-modules-check.php:106
 msgid "some Zoo items"
 msgstr "κάποια Zoo αντικείμενα"
@@ -1180,8 +1176,8 @@ msgid "https://wordpress.org/plugins/fg-joomla-to-wordpress/"
 msgstr "https://wordpress.org/plugins/fg-joomla-to-wordpress/"
 
 #. Author of the plugin
-msgid "Frédéric GILLES"
-msgstr "Frédéric GILLES"
+msgid "Frédéric GILLES (mod by teoli)"
+msgstr "Frédéric GILLES (mod by teoli)"
 
 #. Author URI of the plugin
 msgid "https://www.fredericgilles.net/"

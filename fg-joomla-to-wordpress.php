@@ -16,7 +16,7 @@
  * Plugin URI:        https://wordpress.org/plugins/fg-joomla-to-wordpress/
  * Description:       A plugin to migrate categories, posts, images and medias from Joomla to WordPress
  * Version:           4.35.0
- * Author:            Frédéric GILLES
+ * Author:            Frédéric GILLES (mod by teoli)
  * Author URI:        https://www.fredericgilles.net/
  * License:           GPLv2 or later
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt

@@ -16,7 +16,7 @@ if ( !class_exists('FG_Joomla_to_WordPress_Download_FTP', false) ) {
 	 *
 	 * @package    FG_Joomla_to_WordPress_Premium
 	 * @subpackage FG_Joomla_to_WordPress_Premium/admin
-	 * @author     Frédéric GILLES
+	 * @author     Frédéric GILLES (mod by teoli)
 	 */
 	class FG_Joomla_to_WordPress_Download_FTP {
 		

@@ -17,7 +17,7 @@ if ( !class_exists('FG_Joomla_to_WordPress_Modules_Check', false) ) {
 	 *
 	 * @package    FG_Joomla_to_WordPress
 	 * @subpackage FG_Joomla_to_WordPress/admin
-	 * @author     Frédéric GILLES
+	 * @author     Frédéric GILLES (mod by teoli)
 	 */
 	class FG_Joomla_to_WordPress_Modules_Check {
 		
@@ -92,13 +92,6 @@ if ( !class_exists('FG_Joomla_to_WordPress_Modules_Check', false) ) {
 					array('jf_content', 10),
 					'fg-joomla-to-wordpress-premium-joomfish-module/fgj2wp-joomfish.php',
 					sprintf($message_addon, __('some Joom!Fish translations', 'fg-joomla-to-wordpress'), $premium_url, $premium_url . 'joomfish/', __('Joom!Fish add-on', 'fg-joomla-to-wordpress'))
-				),
-				
-				// Falang (Joom!Fish fork)
-				array(array($this, 'count_falang'),
-					array(10),
-					'fg-joomla-to-wordpress-premium-joomfish-module/fgj2wp-joomfish.php',
-					sprintf($message_addon, __('some Falang translations', 'fg-joomla-to-wordpress'), $premium_url, $premium_url . 'joomfish/', __('Joom!Fish add-on', 'fg-joomla-to-wordpress'))
 				),
 				
 				// Zoo
@@ -417,22 +410,6 @@ if ( !class_exists('FG_Joomla_to_WordPress_Modules_Check', false) ) {
 		private function count($table, $min_value) {
 			$prefix = $this->plugin->plugin_options['prefix'];
 			$sql = "SELECT COUNT(*) AS nb FROM {$prefix}{$table}";
-			return ($this->count_sql($sql) > $min_value);
-		}
-
-		/**
-		 * Check for Falang translations not handled by the core article importer
-		 *
-		 * @param int $min_value Minimum value to trigger the warning message
-		 * @return bool Trigger the warning or not
-		 */
-		private function count_falang($min_value) {
-			$prefix = $this->plugin->plugin_options['prefix'];
-			$extra_criteria = '';
-			if ( !empty($this->plugin->plugin_options['import_translations']) ) {
-				$extra_criteria = "WHERE reference_table != 'content' OR reference_field NOT IN ('title', 'alias', 'introtext', 'fulltext', 'attribs', 'metakey', 'metadesc')";
-			}
-			$sql = "SELECT COUNT(*) AS nb FROM {$prefix}falang_content $extra_criteria";
 			return ($this->count_sql($sql) > $min_value);
 		}
 

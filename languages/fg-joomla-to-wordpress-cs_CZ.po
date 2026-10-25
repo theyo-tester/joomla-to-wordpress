@@ -389,10 +389,6 @@ msgstr "některé Joom!Fish překlady"
 msgid "Joom!Fish add-on"
 msgstr "Joom!Fish rozšíření"
 
-#: admin/class-fg-joomla-to-wordpress-modules-check.php:101
-msgid "some Falang translations"
-msgstr "některé Falang překlady"
-
 #: admin/class-fg-joomla-to-wordpress-modules-check.php:108
 msgid "some Zoo items"
 msgstr "některé Zoo položky"

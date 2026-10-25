@@ -5,7 +5,7 @@
  * @since      3.57.0
  * @package    FG_Joomla_to_WordPress_Premium
  * @subpackage FG_Joomla_to_WordPress_Premium/includes
- * @author     Frédéric GILLES
+ * @author     Frédéric GILLES (mod by teoli)
  */
 
 if ( !class_exists('FG_Joomla_to_WordPress_DebugInfo', false) ) {

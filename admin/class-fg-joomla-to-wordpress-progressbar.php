@@ -17,7 +17,7 @@ if ( !class_exists('FG_Joomla_to_WordPress_ProgressBar', false) ) {
 	 *
 	 * @package    FG_Joomla_to_WordPress
 	 * @subpackage FG_Joomla_to_WordPress/admin
-	 * @author     Frédéric GILLES
+	 * @author     Frédéric GILLES (mod by teoli)
 	 */
 	class FG_Joomla_to_WordPress_ProgressBar {
 		

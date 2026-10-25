@@ -424,10 +424,6 @@ msgstr "kelkajn Joom!Fish tradukojn"
 msgid "Joom!Fish add-on"
 msgstr "Joom!Fish aldonaĵo"
 
-#: admin/class-fg-joomla-to-wordpress-modules-check.php:101
-msgid "some Falang translations"
-msgstr "kelkajn Falang tradukojn"
-
 #: admin/class-fg-joomla-to-wordpress-modules-check.php:108
 msgid "some Zoo items"
 msgstr "kelkajn Zoo erojn"
